@@ -34,9 +34,9 @@ namespace DisruptorTest
                 while(currentUpstreamSequence <= avaliableUpstreamSequence)
                 {
                     OnNextAvaliable(
-                        _ringBuffer[currentUpstreamSequence], 
-                        currentUpstreamSequence, 
-                        currentUpstreamSequence < avaliableUpstreamSequence
+                            _ringBuffer[currentUpstreamSequence], 
+                            currentUpstreamSequence, 
+                            currentUpstreamSequence < avaliableUpstreamSequence
                         );
                     currentUpstreamSequence++;
                 }

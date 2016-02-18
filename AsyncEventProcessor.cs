@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,37 +11,80 @@ using System.Threading;
 
 namespace DisruptorTest
 {
-    public abstract class AsyncEventProcessor<T> : AbstractEventProcessor<T> where T : class, new()
+    public interface AsyncEventProcessorImplementation<T>
     {
-        private readonly ConcurrentBag<long> _completed;
-        private CancellationTokenSource cancellationTokenSource;
+        Task OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken);
+    }
 
-        public AsyncEventProcessor(RingBuffer<T> ringBuffer, ISequenceBarrier sequenceBarrier) : base(ringBuffer, sequenceBarrier)
+    public sealed class AsyncEventProcessor<T> : AbstractEventProcessor<T> where T : class, new()
+    {
+        private readonly AsyncEventProcessorImplementation<T> _implementation;
+        private readonly ILock _lock;
+        private readonly CancellationTokenSource _cancellationTokenSource;
+        private SortedSet<long> completed = new SortedSet<long>();
+        private long currentDownstreamBarrierSequence = -1L;
+
+        public AsyncEventProcessor(
+                RingBuffer<T> ringBuffer, 
+                ISequenceBarrier sequenceBarrier, 
+                ILock @lock,
+                AsyncEventProcessorImplementation<T> implementation
+            ) 
+            : base(ringBuffer, sequenceBarrier)
         {
-            _completed = new ConcurrentBag<long>();
+            _implementation = implementation;
+            _lock = @lock;
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        public override void Run()
+        public override void OnNextAvaliable (T @event, long sequence, bool lastInBatch)
         {
-            base.Run();
-            cancellationTokenSource = new CancellationTokenSource();
+            Task.Run(async () =>
+            {
+                try {
+                    await _implementation.OnNext(@event, sequence, lastInBatch, _cancellationTokenSource.Token);
+                    OnCompleted(sequence);
+                } 
+                catch (Exception ex)
+                {
+                    // Todo figure this out.
+                    throw;
+                }
+            }).ConfigureAwait(false);
         }
 
-
-        public sealed override void OnCompleted(long sequence)
+        public override void OnCompleted(long sequence)
         {
-            _completed.Add(sequence);
-
-            _completed.
-
-            base.OnCompleted();
-            _downstreamBarrier.LazySet(sequence);
+            _lock.WithLock(() => {
+                completed.Add(sequence);
+                long newDownstreamBarrierSequence = ConsumeContiguousCompletedSequence();
+                if(newDownstreamBarrierSequence > currentDownstreamBarrierSequence)
+                {
+                    currentDownstreamBarrierSequence = newDownstreamBarrierSequence;
+                    base.OnCompleted(newDownstreamBarrierSequence);
+                }
+            });
         }
 
-        public void Halt()
+        private long ConsumeContiguousCompletedSequence ()
+        {
+            var enumerator = completed.GetEnumerator();
+            enumerator.MoveNext();
+            long completedSequence = enumerator.Current;
+            while (enumerator.MoveNext() && enumerator.Current == completedSequence + 1)
+            {
+                completedSequence = enumerator.Current;
+            }
+
+            completed = new SortedSet<long>(completed.Where(x => x > completedSequence));
+
+            return completedSequence;
+        }
+
+        public override void Halt()
         {
             base.Halt();
-            cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Cancel();
         }
     }
 }
