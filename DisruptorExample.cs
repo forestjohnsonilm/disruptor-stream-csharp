@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Linq;
 using NUnit.Framework;
 using Disruptor.Dsl;
 using Disruptor;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Collections.Generic;
 
 namespace DisruptorTest
 {
@@ -14,26 +17,65 @@ namespace DisruptorTest
         {
             var disruptor = new Disruptor<EventType>(() => new EventType(), (int)Math.Pow(2, 10), TaskScheduler.Default);
 
-            //disruptor.HandleEventsWith
+            var ringBuffer = disruptor.RingBuffer;
+
+            var eventPublishedBarrier = ringBuffer.NewBarrier(new Sequence[0]);
+
+            var messageAuthenticator = new AsyncEventProcessor<EventType>(
+                    disruptor.RingBuffer,
+                    eventPublishedBarrier,
+                    new SpinLock(),
+                    new MessageAuthenticator()
+                );
+
+            var messageAuthenticatedBarrier = disruptor.HandleEventsWith(messageAuthenticator).AsSequenceBarrier();
+
+            var writeAheadLogger = new AsyncEventProcessor<EventType>(
+                    disruptor.RingBuffer,
+                    eventPublishedBarrier,
+                    new SpinLock(),
+                    new WriteAheadLogger()
+                );
+
+            var writeAheadLoggerBarrier = disruptor.HandleEventsWith(writeAheadLogger).AsSequenceBarrier();
+
+            var transactor = new AsyncEventProcessor<EventType>(
+                    disruptor.RingBuffer,
+                    writeAheadLoggerBarrier,
+                    new SpinLock(),
+                    new TransactionBoundaryBlocker<EventType>(
+                            new SpinLock(),
+                            (aggregate) => aggregate.AggregateId,
+                            async (aggregate) =>
+                            {
+                                // TODO refactor this so that there are three functions: Get entity, Modify entity, and Save entity.
+                                await Task.Delay(200);
+                                return aggregate;
+                            }
+                        )
+                );
         }
 
-        class MessageAuthenticator<T> : AsyncEventProcessor<T> where T : class, new()
-        {
-            public MessageAuthenticator(RingBuffer<T> ringBuffer, ISequenceBarrier sequenceBarrier, ILock @lock) 
-            : base(ringBuffer, sequenceBarrier, @lock) { }
-
-            public override void OnNextAvaliable(T @event, long sequence, bool lastInBatch)
+        public class MessageAuthenticator : AsyncEventProcessorImplementation<EventType> {
+            public async Task OnNext(EventType @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
             {
-                Task.Run(async () =>
-                {
-                    await Task.Delay(200);
-                    OnCompleted(sequence);
-                });
+                await Task.Delay(200, cancellationToken);
             }
         }
 
-        class EventType
+        public class WriteAheadLogger : AsyncEventProcessorImplementation<EventType>
         {
+            public async Task OnNext(EventType @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
+            {
+                await Task.Delay(200, cancellationToken);
+            }
+        }
+
+        
+
+        public class EventType
+        {
+            public Guid AggregateId;
             public string Name = "a";
         }
     }

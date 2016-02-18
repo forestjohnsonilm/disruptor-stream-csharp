@@ -11,21 +11,49 @@ using System.Threading;
 
 namespace DisruptorTest
 {
-    public abstract class AsyncEventProcessor<T> : AbstractEventProcessor<T> where T : class, new()
+    public interface AsyncEventProcessorImplementation<T>
     {
+        Task OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken);
+    }
+
+    public sealed class AsyncEventProcessor<T> : AbstractEventProcessor<T> where T : class, new()
+    {
+        private readonly AsyncEventProcessorImplementation<T> _implementation;
         private readonly ILock _lock;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private SortedSet<long> completed = new SortedSet<long>();
         private long currentDownstreamBarrierSequence = -1L;
 
-        public AsyncEventProcessor(RingBuffer<T> ringBuffer, ISequenceBarrier sequenceBarrier, ILock @lock) 
+        public AsyncEventProcessor(
+                RingBuffer<T> ringBuffer, 
+                ISequenceBarrier sequenceBarrier, 
+                ILock @lock,
+                AsyncEventProcessorImplementation<T> implementation
+            ) 
             : base(ringBuffer, sequenceBarrier)
         {
+            _implementation = implementation;
             _lock = @lock;
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        public sealed override void OnCompleted(long sequence)
+        public override void OnNextAvaliable (T @event, long sequence, bool lastInBatch)
+        {
+            Task.Run(async () =>
+            {
+                try {
+                    await _implementation.OnNext(@event, sequence, lastInBatch, _cancellationTokenSource.Token);
+                    OnCompleted(sequence);
+                } 
+                catch (Exception ex)
+                {
+                    // Todo figure this out.
+                    throw;
+                }
+            }).ConfigureAwait(false);
+        }
+
+        public override void OnCompleted(long sequence)
         {
             _lock.WithLock(() => {
                 completed.Add(sequence);
