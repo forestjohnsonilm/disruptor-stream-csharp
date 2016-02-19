@@ -17,24 +17,26 @@ namespace DisruptorTest
                 ILock @lock, 
                 Func<T, Guid> idGetter, 
                 Func<T, Task<TAggregate>> getAggregate,
-                Func<T, TAggregate, TAggregate> processAggregate,
+                Func<T, Func<TAggregate, TAggregate>> getProcess,
                 Func<TAggregate, Task> saveAggregate
             )
         {
             _lock = @lock;
             _idGetter = idGetter;
             _loadAggregate = getAggregate;
-            _processAggregate = processAggregate;
+            _getProcess = getProcess;
             _saveAggregate = saveAggregate;
         }
 
-        private readonly Dictionary<Guid, Queue<Action<T>>> _blocked = new Dictionary<Guid, Queue<Action<T>>>();
+        private delegate TAggregate Process(T @event, TAggregate aggregate);
+
+        private readonly Dictionary<Guid, Queue<Func<TAggregate, TAggregate>>> _blocked = new Dictionary<Guid, Queue<Func<TAggregate, TAggregate>>>();
         private readonly ILock _lock;
         private readonly Func<T, Guid> _idGetter;
         
         private readonly Func<T, Task<TAggregate>> _loadAggregate;
-        private readonly Func<T, TAggregate, TAggregate> _processAggregate;
-        private readonly Func<T, Task> _saveAggregate;
+        private readonly Func<T, Func<TAggregate, TAggregate>> _getProcess;
+        private readonly Func<TAggregate, Task> _saveAggregate;
 
         public async Task OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
         {
@@ -46,18 +48,18 @@ namespace DisruptorTest
             }
         }
 
-        private bool EnqueueAndReturnTrueIfFirst(T aggregate)
+        private bool EnqueueAndReturnTrueIfFirst(T @event)
         {
-            var aggregateId = _idGetter(aggregate);
+            var aggregateId = _idGetter(@event);
             bool isFirstTaskInQueue = false;
             _lock.WithLock(() => {
-                Queue<Action<T>> queueForAggregate;
+                Queue<Func<TAggregate, TAggregate>> queueForAggregate;
                 if (!_blocked.TryGetValue(aggregateId, out queueForAggregate))
                 {
-                    queueForAggregate = new Queue<Action<T>>();
+                    queueForAggregate = new Queue<Func<TAggregate, TAggregate>>();
                     _blocked.Add(aggregateId, queueForAggregate);
                 }
-                queueForAggregate.Enqueue();
+                queueForAggregate.Enqueue(_getProcess(@event));
 
                 isFirstTaskInQueue = queueForAggregate.Count == 1;
             });
@@ -76,12 +78,12 @@ namespace DisruptorTest
             {
                 while (queueForAggregate.Count > 0)
                 {
-                    Action<T> nextCommandInQueue = _blocked[aggregateId].Dequeue();
-                    nextCommandInQueue(@event);
+                    Func<TAggregate, TAggregate> nextProcessInQueue = _blocked[aggregateId].Dequeue();
+                    aggregate = nextProcessInQueue(aggregate);
                 }
             });
 
-            await _saveAggregate(@event);
+            await _saveAggregate(aggregate);
         }
     }
 }

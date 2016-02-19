@@ -68,18 +68,20 @@ namespace DisruptorTest
 
         private long ConsumeContiguousCompletedSequence ()
         {
-            var enumerator = completed.GetEnumerator();
-            enumerator.MoveNext();
-            long completedSequence = enumerator.Current;
-            while (enumerator.MoveNext() && enumerator.Current == completedSequence + 1)
+            using (var enumerator = completed.GetEnumerator())
             {
-                completedSequence = enumerator.Current;
+                long completedSequence = currentDownstreamBarrierSequence;
+                while (enumerator.MoveNext() && enumerator.Current == completedSequence + 1)
+                {
+                    completedSequence = enumerator.Current;
+                }
+
+                completed = new SortedSet<long>(completed.Where(x => x > completedSequence));
+
+                return completedSequence;
             }
-
-            completed = new SortedSet<long>(completed.Where(x => x > completedSequence));
-
-            return completedSequence;
         }
+                
 
         public override void Halt()
         {

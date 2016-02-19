@@ -12,6 +12,8 @@ namespace DisruptorTest
     [TestFixture]
     public class DisruptorExample
     {
+        private readonly InMemoryDatabase _inMemoryDatabase = new InMemoryDatabase();
+
         [Test]
         public void DemonstrateDisruptor()
         {
@@ -20,15 +22,6 @@ namespace DisruptorTest
             var ringBuffer = disruptor.RingBuffer;
 
             var eventPublishedBarrier = ringBuffer.NewBarrier(new Sequence[0]);
-
-            var messageAuthenticator = new AsyncEventProcessor<EventType>(
-                    disruptor.RingBuffer,
-                    eventPublishedBarrier,
-                    new SpinLock(),
-                    new MessageAuthenticator()
-                );
-
-            var messageAuthenticatedBarrier = disruptor.HandleEventsWith(messageAuthenticator).AsSequenceBarrier();
 
             var writeAheadLogger = new AsyncEventProcessor<EventType>(
                     disruptor.RingBuffer,
@@ -39,34 +32,32 @@ namespace DisruptorTest
 
             var writeAheadLoggerBarrier = disruptor.HandleEventsWith(writeAheadLogger).AsSequenceBarrier();
 
-            var transactor = new AsyncEventProcessor<EventType>(
+            var exampleCommandProcessor = new AsyncEventProcessor<EventType>(
                     disruptor.RingBuffer,
                     writeAheadLoggerBarrier,
                     new SpinLock(),
-                    new TransactionBoundaryBlocker<EventType>(
+                    new SimpleAggregateProcessor<EventType, ExampleAggregate>(
                             new SpinLock(),
-                            (aggregate) => aggregate.AggregateId,
-                            async (aggregate) =>
-                            {
-                                // TODO refactor this so that there are three functions: Get entity, Modify entity, and Save entity.
-                                await Task.Delay(200);
-                                return aggregate;
-                            }
+                            (@event) => @event.ExampleAggregateId,
+                            (@event) => _inMemoryDatabase.GetOrCreate(@event.ExampleAggregateId),
+                            (@event) => {
+                                return (aggregate) =>
+                                {
+                                    var result = @event.ExampleCommand.Process(aggregate);
+                                    result.Version++;
+                                    return result;
+                                };
+                            },
+                            (aggregate) => _inMemoryDatabase.Upsert(aggregate)
                         )
                 );
-        }
-
-        public class MessageAuthenticator : AsyncEventProcessorImplementation<EventType> {
-            public async Task OnNext(EventType @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
-            {
-                await Task.Delay(200, cancellationToken);
-            }
         }
 
         public class WriteAheadLogger : AsyncEventProcessorImplementation<EventType>
         {
             public async Task OnNext(EventType @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
             {
+                // Simulate a delay reaching a logging service
                 await Task.Delay(200, cancellationToken);
             }
         }
@@ -75,8 +66,64 @@ namespace DisruptorTest
 
         public class EventType
         {
-            public Guid AggregateId;
-            public string Name = "a";
+            public Guid ExampleAggregateId;
+            public ICommand<ExampleAggregate> ExampleCommand;
+        }
+
+        public interface ICommand<T>
+        {
+            T Process(T input);
+        }
+
+        public class ExampleCountingCommand : ICommand<ExampleAggregate>
+        {
+            public int ToAdd { get; set; }
+
+            public ExampleAggregate Process(ExampleAggregate input)
+            {
+                input.Sum += ToAdd;
+                return input;
+            }
+        }
+
+        public class ExampleAggregate : ICloneable
+        {
+            public Guid Id { get; set; }
+            public int Sum { get; set; }
+            public int Version { get; set; }
+
+            public object Clone()
+            {
+                return this.MemberwiseClone();
+            }
+        }
+
+        public class InMemoryDatabase
+        {
+            private readonly Dictionary<Guid, ExampleAggregate> _byId = new Dictionary<Guid, ExampleAggregate>();
+
+            public async Task<ExampleAggregate> GetOrCreate(Guid id)
+            {
+                // Simulate a delay reaching a database over the network
+                await Task.Delay(200);
+                if (_byId.ContainsKey(id))
+                {
+                    return  (ExampleAggregate)_byId[id].Clone();
+                }
+                else
+                {
+                    var aggregate = new ExampleAggregate() { Id = id, Sum = 0 };
+                    _byId[aggregate.Id] = aggregate;
+                    return aggregate;
+                }
+            }
+
+            public async Task Upsert(ExampleAggregate aggregate)
+            {
+                // Simulate a delay reaching a database over the network
+                await Task.Delay(200);
+                _byId[aggregate.Id] = aggregate;
+            }
         }
     }
 }

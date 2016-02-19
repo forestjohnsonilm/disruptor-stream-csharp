@@ -67,7 +67,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="AbstractEventProcessor.cs" />
-    <Compile Include="TransactionBoundaryBlocker.cs" />
+    <Compile Include="SimpleAggregateProcessor.cs" />
     <Compile Include="AsyncEventProcessor.cs" />
     <Compile Include="DisruptorExample.cs" />
     <Compile Include="ILock.cs" />
