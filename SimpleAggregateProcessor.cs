@@ -11,14 +11,14 @@ using System.Threading;
 
 namespace DisruptorTest
 {
-    public class TransactionBoundaryBlocker<T> : AsyncEventProcessorImplementation<T>
+    public class SimpleAggregateProcessor<T, TAggregate> : AsyncEventProcessorImplementation<T>
     {
-        public TransactionBoundaryBlocker(
+        public SimpleAggregateProcessor(
                 ILock @lock, 
                 Func<T, Guid> idGetter, 
-                Func<T, Task> getAggregate,
-                Action<T> processAggregate,
-                Func<T, Task> saveAggregate
+                Func<T, Task<TAggregate>> getAggregate,
+                Func<T, TAggregate, TAggregate> processAggregate,
+                Func<TAggregate, Task> saveAggregate
             )
         {
             _lock = @lock;
@@ -31,10 +31,9 @@ namespace DisruptorTest
         private readonly Dictionary<Guid, Queue<Action<T>>> _blocked = new Dictionary<Guid, Queue<Action<T>>>();
         private readonly ILock _lock;
         private readonly Func<T, Guid> _idGetter;
-
-        // TODO refactor this so that there are three functions: Get entity, Modify entity, and Save entity.
-        private readonly Func<T, Task> _loadAggregate;
-        private readonly Action<T> _processAggregate;
+        
+        private readonly Func<T, Task<TAggregate>> _loadAggregate;
+        private readonly Func<T, TAggregate, TAggregate> _processAggregate;
         private readonly Func<T, Task> _saveAggregate;
 
         public async Task OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
@@ -58,7 +57,7 @@ namespace DisruptorTest
                     queueForAggregate = new Queue<Action<T>>();
                     _blocked.Add(aggregateId, queueForAggregate);
                 }
-                queueForAggregate.Enqueue(_processAggregate);
+                queueForAggregate.Enqueue();
 
                 isFirstTaskInQueue = queueForAggregate.Count == 1;
             });
@@ -71,34 +70,16 @@ namespace DisruptorTest
             var aggregateId = _idGetter(@event);
             var queueForAggregate = _blocked[aggregateId];
 
-            await _loadAggregate(@event);
+            var aggregate = await _loadAggregate(@event);
 
             _lock.WithLock(() =>
             {
-
-            });
-
-            bool moreToConsume = true;
-            while (moreToConsume == true)
-            {
-                Action<T> nextTaskInQueue = null;
-                
-                    if (queueForAggregate.Count == 0)
-                    {
-                        _blocked.Remove(aggregateId);
-                        nextTaskInQueue = null;
-                        moreToConsume = false;
-                    }
-                    else
-                    {
-                        nextTaskInQueue = _blocked[aggregateId].Dequeue();
-                    }
-
-                if (nextTaskInQueue != null)
+                while (queueForAggregate.Count > 0)
                 {
-                    nextTaskInQueue(@event);
+                    Action<T> nextCommandInQueue = _blocked[aggregateId].Dequeue();
+                    nextCommandInQueue(@event);
                 }
-            }
+            });
 
             await _saveAggregate(@event);
         }
