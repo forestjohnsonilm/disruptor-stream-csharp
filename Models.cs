@@ -38,17 +38,20 @@ namespace DisruptorTest
 
     public class TodoList : BaseTodoList
     {
-        public TodoList(Guid id) : base(id)
+        public TodoList(Guid id)
         {
             LineItems = Enumerable.Empty<LineItem>();
         }
-        public TodoList(Guid id, IEnumerable<LineItem> lineItems) : base(id)
+        public TodoList(Guid id, IEnumerable<LineItem> lineItems)
         {
             LineItems = lineItems;
         }
-        public TodoList(BaseTodoList @base, IEnumerable<LineItem> lineItems)
-            : base(@base.Id, @base.Version, @base.Title, @base.Description)
+        public TodoList(Guid id, int version, string title, string description, IEnumerable<LineItem> lineItems)
         {
+            Id = id;
+            Version = version;
+            Title = title;
+            Description = description;
             LineItems = lineItems;
         }
 
@@ -56,8 +59,9 @@ namespace DisruptorTest
 
         public static TodoList Merge(IEnumerable<TodoList> lists)
         {
+            var newest = lists.OrderByDescending(x => x.Version).First();
             return new TodoList(
-                lists.OrderByDescending(x => x.Version).First(),
+                newest.Id, newest.Version, newest.Title, newest.Description,
                 Merger<LineItem, int>.GroupByIdAndMerge(
                     lists.SelectMany(x => x.LineItems),
                     (x) => x.Id,
@@ -73,27 +77,18 @@ namespace DisruptorTest
         public int Version;
         public string Title;
         public string Description;
-
-        public BaseTodoList(Guid id)
-        {
-            Id = id;
-        }
-        public BaseTodoList(Guid id, int version, string title, string description)
-        {
-            Id = id;
-            Version = version;
-            Title = title;
-            Description = description;
-        }
     }
 
     public class IncomingTodoList : BaseTodoList
     {
         public SyncType SyncType;
 
-        public IncomingTodoList(BaseTodoList @base, SyncType syncType)
-            : base(@base.Id, @base.Version, @base.Title, @base.Description)
+        public IncomingTodoList(Guid id, int version, string title, string description, SyncType syncType)
         {
+            Id = id;
+            Version = version;
+            Title = title;
+            Description = description;
             SyncType = syncType;
         }
     }

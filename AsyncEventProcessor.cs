@@ -14,11 +14,13 @@ namespace DisruptorTest
     public interface AsyncEventProcessorImplementation<T>
     {
         Task OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken);
+        bool ShouldSpawnTaskFor(T @event, long sequence, bool endOfBatch);
     }
 
     public sealed class AsyncEventProcessor<T> : AbstractEventProcessor<T> where T : class, new()
     {
         private readonly AsyncEventProcessorImplementation<T> _implementation;
+        private readonly Action<Exception> _onException;
         private readonly ILock _lock;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private SortedSet<long> completed = new SortedSet<long>();
@@ -28,10 +30,12 @@ namespace DisruptorTest
                 RingBuffer<T> ringBuffer, 
                 ISequenceBarrier sequenceBarrier, 
                 ILock @lock,
+                Action<Exception> onException,
                 AsyncEventProcessorImplementation<T> implementation
             ) 
             : base(ringBuffer, sequenceBarrier)
         {
+            _onException = onException;
             _implementation = implementation;
             _lock = @lock;
             _cancellationTokenSource = new CancellationTokenSource();
@@ -39,22 +43,18 @@ namespace DisruptorTest
 
         public override void OnNextAvaliable (T @event, long sequence, bool lastInBatch)
         {
-            Task.Run(async () =>
+            if(_implementation.ShouldSpawnTaskFor(@event, sequence, lastInBatch))
             {
-                try {
+                TaskExtensions.FireAndForget(async () => {
                     await _implementation.OnNext(@event, sequence, lastInBatch, _cancellationTokenSource.Token);
                     OnCompleted(sequence);
-                } 
-                catch (Exception ex)
-                {
-                    // Todo figure this out.
-                    throw;
-                }
-            }).ConfigureAwait(false);
+                }, _onException);
+            }
         }
 
         public override void OnCompleted(long sequence)
         {
+            Console.WriteLine("OnCompleted", this,GetHashCode(), sequence);
             _lock.WithLock(() => {
                 completed.Add(sequence);
                 long newDownstreamBarrierSequence = ConsumeContiguousCompletedSequence();

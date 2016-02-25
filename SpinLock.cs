@@ -13,7 +13,7 @@ namespace DisruptorTest
 {
     public class SpinLock : ILock
     {
-        private readonly System.Threading.SpinLock _lock;
+        private System.Threading.SpinLock _lock;
 
         public SpinLock()
         {
@@ -30,7 +30,7 @@ namespace DisruptorTest
             }
             finally
             {
-                if (lockAcquired) _lock.Exit(false);
+                if (lockAcquired) _lock.Exit(true);
             }
         }
     }

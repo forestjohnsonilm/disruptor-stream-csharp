@@ -15,10 +15,10 @@ namespace DisruptorTest
     public class DisruptorExample
     {
         [Test]
-        public void DemonstrateDisruptor()
+        public async Task DemonstrateDisruptor()
         {
             var parallelism = 4;
-            var listsPerRequest = 10;
+            var listsPerRequest = 5;
             var numberOfTodoLists = 10;
             var numberOfUpdates = 10;
             var maxNumberOfItemsPerList = 4;
@@ -52,21 +52,13 @@ namespace DisruptorTest
             // so we start them manually. If they were to be started twice, it would throw an exception. 
             foreach(var requestExecutor in executeRequests)
             {
-                Task.Factory.StartNew(
-                    requestExecutor.Run,
-                    CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default
-                );
+                TaskExtensions.CreateNewLongRunningTask(() => requestExecutor.Run(), (ex) => Assert.Fail(ex.StackTrace));
             }
 
             var eventPublisher = new EventPublisher<EventType>(configuredRingBuffer);
 
-            var fakeData = FakeDataGenerator.Generate(numberOfTodoLists, numberOfUpdates, maxNumberOfItemsPerList);
+            var messages = FakeDataGenerator.Generate(numberOfTodoLists, numberOfUpdates, maxNumberOfItemsPerList);
 
-            LoadTest(eventPublisher, () => disruptor.Shutdown(), fakeData);
-        }
-
-        private void LoadTest(EventPublisher<EventType> eventPublisher, Action shutdown, IncomingMessage[] messages)
-        {
             Console.WriteLine("");
             Console.WriteLine("===========================");
             Console.WriteLine("");
@@ -80,7 +72,8 @@ namespace DisruptorTest
                     return @event;
                 });
             }
-            shutdown();
+            await Task.Delay(new TimeSpan(0,0,0,0,3000));
+            //disruptor.Shutdown();
             timer.Stop();
 
             Console.WriteLine("");
@@ -88,6 +81,8 @@ namespace DisruptorTest
             Console.WriteLine("");
             Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms");
         }
+        
+     
 
         private ParallelEventHandler<EventType>[] GetDeserializers(int parallelism)
         {
@@ -124,7 +119,7 @@ namespace DisruptorTest
                         Content = from todoList in content.TodoLists.Where(x => x.SyncType == SyncType.CreateOrUpdate)
                                   join lineItem in content.LineItems.Where(x => x.SyncType == SyncType.CreateOrUpdate)
                                       on todoList.Id equals lineItem.TodoListId into lineItems
-                                  select new TodoList(todoList, lineItems)
+                                  select new TodoList(todoList.Id, todoList.Version, todoList.Title, todoList.Description, lineItems)
                     };
                 };
 
@@ -162,34 +157,48 @@ namespace DisruptorTest
 
         private IEventProcessor[] GetRequestExecutors (RingBuffer<EventType> ringBuffer, ISequenceBarrier sequenceBarrier)
         {
+            var createOrUpdateRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
+                (@event) => {
+                    LogRequest("cr", @event.CreateOrUpdateTodoListRequest);
+                    return @event.CreateOrUpdateTodoListRequest;
+                }
+            );
+            var deleteRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
+                (@event) => {
+                    LogRequest("del", @event.CreateOrUpdateTodoListRequest);
+                    return @event.CreateOrUpdateTodoListRequest;
+                }
+            );
+            var removeItemsRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
+                (@event) => {
+                    LogRequest("rm", @event.CreateOrUpdateTodoListRequest);
+                    return @event.CreateOrUpdateTodoListRequest;
+                }
+            );
+
             return new IEventProcessor[] {
-                new AsyncEventProcessor<EventType>(ringBuffer, sequenceBarrier, new SpinLock(),
-                    new RequestExecutor<EventType, OutgoingRequest>((@event) => @event.CreateOrUpdateTodoListRequest)),
-
-                new AsyncEventProcessor<EventType>(ringBuffer, sequenceBarrier, new SpinLock(),
-                    new RequestExecutor<EventType, OutgoingRequest>((@event) => @event.DeleteTodoListsRequest)),
-
-                new AsyncEventProcessor<EventType>(ringBuffer, sequenceBarrier, new SpinLock(),
-                    new RequestExecutor<EventType, OutgoingRequest>((@event) => @event.RemoveLineItemsRequest)),
+                new AsyncEventProcessor<EventType>(
+                    ringBuffer, sequenceBarrier, new SpinLock(), (ex) => Assert.Fail(ex.StackTrace),
+                    createOrUpdateRequestExecutor
+                ),
+                new AsyncEventProcessor<EventType>(
+                    ringBuffer, sequenceBarrier, new SpinLock(), (ex) => Assert.Fail(ex.StackTrace),
+                    deleteRequestExecutor
+                ),
+                new AsyncEventProcessor<EventType>(
+                    ringBuffer, sequenceBarrier, new SpinLock(), (ex) => Assert.Fail(ex.StackTrace),
+                    removeItemsRequestExecutor
+                ),
             };
         }
 
-        private class RequestExecutor<TEvent, TPayload> : AsyncEventProcessorImplementation<TEvent>
+        private void LogRequest(string prefix, OutgoingRequest request)
         {
-            private readonly Func<TEvent, TPayload> _getPayload;
-            public RequestExecutor(Func<TEvent, TPayload> getPayload)
-            {
-                _getPayload = getPayload;
-            }
-
-            public async Task OnNext(TEvent @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
-            {
-                var payload = _getPayload(@event);
-                if(payload != null)
-                {
-                    await MockExternalService<TPayload>.Call(payload);
-                }
-            }
+            if (request == null)
+                return;
+            var content = request.Content;
+            var ss = String.Join(",\n", content.Select(list => list.Id + "  " + list.Version + "   "));
+            Console.WriteLine(prefix + ": " + ss);
         }
 
         public class EventType

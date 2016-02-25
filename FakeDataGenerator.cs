@@ -46,6 +46,7 @@ namespace DisruptorTest
                     lineItems.Add(new IncomingLineItem()
                     {
                         Id = j,
+                        TodoListId = todoListId,
                         Version = todoListVersion,
                         SortOrder = itemCount - j,
                         Done = random.NextDouble() > 0.5d,
@@ -58,7 +59,10 @@ namespace DisruptorTest
                 {
                     TodoLists = new List<IncomingTodoList>() {
                         new IncomingTodoList(
-                            new BaseTodoList(todoListId, todoListVersion, Guid.NewGuid().ToString(), Guid.NewGuid().ToString() ),
+                            todoListId,
+                            todoListVersion,
+                            Guid.NewGuid().ToString(),
+                            Guid.NewGuid().ToString(),
                             random.NextDouble() > 0.5d ? SyncType.CreateOrUpdate : SyncType.Delete
                         )
                     },
@@ -71,7 +75,7 @@ namespace DisruptorTest
                     ContentJson = json
                 };
 
-                Console.WriteLine(json);
+                //Console.WriteLine(json);
             }
 
             return messages;
