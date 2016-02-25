@@ -17,6 +17,8 @@ namespace DisruptorTest
 
         private readonly Random _randomNetworkLatency = new Random();
 
+        private int _baseLatencyMs = 20;
+
         private class ExternalCall
         {
             public DateTime TimeToComplete;
@@ -48,9 +50,10 @@ namespace DisruptorTest
 
         public Task<TResult> Call(TPayload payload)
         {
+            var randomLatency = new TimeSpan(0, 0, 0, 0, _baseLatencyMs + (_randomNetworkLatency.Next() % _baseLatencyMs));
             var externalCall = new ExternalCall()
             {
-                TimeToComplete = DateTime.UtcNow + new TimeSpan(0, 0, 0, 0, 100 + (_randomNetworkLatency.Next() % 100)),
+                TimeToComplete = DateTime.UtcNow + randomLatency,
                 CompletionSource = new TaskCompletionSource<TResult>()
             };
 
@@ -61,9 +64,10 @@ namespace DisruptorTest
 
         public void CallWithCallback(TPayload payload, Action<TResult> callback)
         {
-            var externalCall = new ExternalCall()
+        var randomLatency = new TimeSpan(0, 0, 0, 0, _baseLatencyMs + (_randomNetworkLatency.Next() % _baseLatencyMs));
+        var externalCall = new ExternalCall()
             {
-                TimeToComplete = DateTime.UtcNow + new TimeSpan(0, 0, 0, 0, 100 + (_randomNetworkLatency.Next() % 100)),
+                TimeToComplete = DateTime.UtcNow + randomLatency,
                 Callback = callback
             };
 
