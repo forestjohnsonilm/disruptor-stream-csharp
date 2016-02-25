@@ -10,24 +10,24 @@ using Newtonsoft.Json;
 
 namespace DisruptorTest
 {
-    public class ParallelEventHandler<T> : IEventHandler<T>
+    public class InterleavedParallelEventHandler<T> : IEventHandler<T>
     {
         private readonly int _partitionId;
         private readonly int _partitionCount;
         private readonly Action<T, long, bool> _action;
 
-        public static ParallelEventHandler<T>[] Group(int parallelism, Action<T, long, bool> action)
+        public static InterleavedParallelEventHandler<T>[] Group(int parallelism, Action<T, long, bool> action)
         {
-            var toReturn = new ParallelEventHandler<T>[parallelism];
+            var toReturn = new InterleavedParallelEventHandler<T>[parallelism];
             for(var i = 0; i < parallelism; i++)
             {
-                toReturn[i] = new ParallelEventHandler<T>(i, parallelism, action);
+                toReturn[i] = new InterleavedParallelEventHandler<T>(i, parallelism, action);
             }
 
             return toReturn;
         }
 
-        protected ParallelEventHandler(int partitionId, int partitionCount, Action<T, long, bool> action)
+        protected InterleavedParallelEventHandler(int partitionId, int partitionCount, Action<T, long, bool> action)
         {
             _partitionId = partitionId;
             _partitionCount = partitionCount;

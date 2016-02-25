@@ -74,7 +74,7 @@
     <Compile Include="Extensions.cs" />
     <Compile Include="FakeDataGenerator.cs" />
     <Compile Include="OptimizedDeserializer.cs" />
-    <Compile Include="ParallelEventHandler.cs" />
+    <Compile Include="InterleavedParallelEventHandler.cs" />
     <Compile Include="MockExternalService.cs" />
     <Compile Include="SimpleEventHandler.cs" />
     <Compile Include="RequestSender.cs" />

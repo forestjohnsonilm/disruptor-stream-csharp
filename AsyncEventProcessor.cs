@@ -76,6 +76,7 @@ namespace DisruptorTest
         {
             base.Halt();
             _cancellationTokenSource.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
         }
     }
 }

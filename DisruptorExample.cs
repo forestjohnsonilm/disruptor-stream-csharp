@@ -156,7 +156,7 @@ namespace DisruptorTest
         }
      
 
-        private ParallelEventHandler<EventType>[] GetDeserializers(int parallelism)
+        private InterleavedParallelEventHandler<EventType>[] GetDeserializers(int parallelism)
         {
             Action<EventType, long, bool> deserializeAction = (@event, sequence, isEndOfBatch) =>
             {
@@ -168,7 +168,7 @@ namespace DisruptorTest
                 @event.IncomingMessage.ContentJson = null;
             };
 
-            return ParallelEventHandler<EventType>.Group(parallelism, deserializeAction);
+            return InterleavedParallelEventHandler<EventType>.Group(parallelism, deserializeAction);
         }
 
         private RequestBuilder<EventType>[] GetRequestBuilders(int listsPerRequest)
