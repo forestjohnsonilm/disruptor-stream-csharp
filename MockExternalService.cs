@@ -21,6 +21,7 @@ namespace DisruptorTest
         {
             public DateTime TimeToComplete;
             public TaskCompletionSource<TResult> CompletionSource;
+            public Action<TResult> Callback;
         }
 
         public void Run()
@@ -30,9 +31,18 @@ namespace DisruptorTest
                 var next = _completionSources.Take();
                 if(next.TimeToComplete > DateTime.UtcNow)
                 {
-                    Thread.Sleep(10);
+                    Thread.Sleep(0);
                 }
-                next.CompletionSource.TrySetResult(default(TResult));
+
+                if(next.CompletionSource != null)
+                {
+                    next.CompletionSource.TrySetResult(default(TResult));
+                }
+                else
+                {
+                    next.Callback(default(TResult));
+                }
+                
             }
         }
 
@@ -47,6 +57,17 @@ namespace DisruptorTest
             _completionSources.Add(externalCall);
 
             return externalCall.CompletionSource.Task;
+        }
+
+        public void CallWithCallback(TPayload payload, Action<TResult> callback)
+        {
+            var externalCall = new ExternalCall()
+            {
+                TimeToComplete = DateTime.UtcNow + new TimeSpan(0, 0, 0, 0, 100 + (_randomNetworkLatency.Next() % 100)),
+                Callback = callback
+            };
+
+            _completionSources.Add(externalCall);
         }
     }
 }

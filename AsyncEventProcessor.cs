@@ -13,14 +13,12 @@ namespace DisruptorTest
 {
     public interface AsyncEventProcessorImplementation<T>
     {
-        Task OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken);
-        bool ShouldSpawnTaskFor(T @event, long sequence, bool endOfBatch);
+        void OnNext(T @event, long sequence, bool endOfBatch, CancellationToken cancellationToken, Action<long> callback);
     }
 
     public sealed class AsyncEventProcessor<T> : AbstractEventProcessor<T> where T : class, new()
     {
         private readonly AsyncEventProcessorImplementation<T> _implementation;
-        private readonly Action<Exception> _onException;
         private readonly ILock _lock;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private SortedSet<long> completed = new SortedSet<long>();
@@ -30,12 +28,10 @@ namespace DisruptorTest
                 RingBuffer<T> ringBuffer, 
                 ISequenceBarrier sequenceBarrier, 
                 ILock @lock,
-                Action<Exception> onException,
                 AsyncEventProcessorImplementation<T> implementation
             ) 
             : base(ringBuffer, sequenceBarrier)
         {
-            _onException = onException;
             _implementation = implementation;
             _lock = @lock;
             _cancellationTokenSource = new CancellationTokenSource();
@@ -43,17 +39,7 @@ namespace DisruptorTest
 
         public override void OnNextAvaliable (T @event, long sequence, bool lastInBatch)
         {
-            if(_implementation.ShouldSpawnTaskFor(@event, sequence, lastInBatch))
-            {
-                AsyncExtensions.FireAndForget(async () => {
-                    await _implementation.OnNext(@event, sequence, lastInBatch, _cancellationTokenSource.Token);
-                    OnCompleted(sequence);
-                }, _onException);
-            }
-            else
-            {
-                OnCompleted(sequence);
-            }
+            _implementation.OnNext(@event, sequence, lastInBatch, _cancellationTokenSource.Token, (s) => OnCompleted(s));
         }
 
         public override void OnCompleted(long sequence)

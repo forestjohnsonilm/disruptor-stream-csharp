@@ -71,7 +71,7 @@ namespace DisruptorTest
             // Since the Request Senders are EventProcessors(async) instead of EventHandlers(synchronous)
             // We have to manually create a sequence barrier and pass it in instead of just calling .Then() again.
             var barrierUntilRequestsAreGrouped = disruptor.After(groupIntoRequests).AsSequenceBarrier();
-            var sendRequests = GetRequestSenders(ringBuffer, barrierUntilRequestsAreGrouped);
+            var sendRequests = GetRequestSenders(ringBuffer, barrierUntilRequestsAreGrouped, RequestSenderMode.Callback);
 
             disruptor.HandleEventsWith(sendRequests);
 
@@ -225,7 +225,10 @@ namespace DisruptorTest
         }
 
 
-        private IEventProcessor[] GetRequestSenders (RingBuffer<EventType> ringBuffer, ISequenceBarrier sequenceBarrier)
+        private IEventProcessor[] GetRequestSenders (
+            RingBuffer<EventType> ringBuffer, 
+            ISequenceBarrier sequenceBarrier,
+            RequestSenderMode mode)
         {
             var mockExternalService = new MockExternalService<OutgoingRequest, int>();
             AsyncExtensions.CreateNewLongRunningTask(
@@ -234,27 +237,24 @@ namespace DisruptorTest
             );
 
             var createOrUpdateRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
-                (@event) => @event.CreateOrUpdateTodoListRequest, mockExternalService
+                (@event) => @event.CreateOrUpdateTodoListRequest, mockExternalService, mode, (ex) => Assert.Fail(ex.StackTrace)
             );
             var deleteRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
-                (@event) => @event.DeleteTodoListsRequest, mockExternalService
+                (@event) => @event.DeleteTodoListsRequest, mockExternalService, mode, (ex) => Assert.Fail(ex.StackTrace)
             );
             var removeItemsRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
-                (@event) => @event.RemoveLineItemsRequest, mockExternalService
+                (@event) => @event.RemoveLineItemsRequest, mockExternalService, mode, (ex) => Assert.Fail(ex.StackTrace)
             );
 
             return new IEventProcessor[] {
                 new AsyncEventProcessor<EventType>(
-                    ringBuffer, sequenceBarrier, new SpinLock(), (ex) => Assert.Fail(ex.StackTrace),
-                    createOrUpdateRequestExecutor
+                    ringBuffer, sequenceBarrier, new SpinLock(), createOrUpdateRequestExecutor
                 ),
                 new AsyncEventProcessor<EventType>(
-                    ringBuffer, sequenceBarrier, new SpinLock(), (ex) => Assert.Fail(ex.StackTrace),
-                    deleteRequestExecutor
+                    ringBuffer, sequenceBarrier, new SpinLock(),  deleteRequestExecutor
                 ),
                 new AsyncEventProcessor<EventType>(
-                    ringBuffer, sequenceBarrier, new SpinLock(), (ex) => Assert.Fail(ex.StackTrace),
-                    removeItemsRequestExecutor
+                    ringBuffer, sequenceBarrier, new SpinLock(),  removeItemsRequestExecutor
                 ),
             };
         }

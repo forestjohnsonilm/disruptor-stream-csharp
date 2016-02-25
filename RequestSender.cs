@@ -12,23 +12,51 @@ namespace DisruptorTest
 {
     public class RequestSender<TEvent, TPayload> : AsyncEventProcessorImplementation<TEvent>
     {
-        private MockExternalService<TPayload, int> _mockService;
-
+        private readonly MockExternalService<TPayload, int> _mockService;
+        private readonly Action<Exception> _onException;
         private readonly Func<TEvent, TPayload> _getPayload;
-        public RequestSender(Func<TEvent, TPayload> getPayload, MockExternalService<TPayload, int> mockService)
+        private readonly RequestSenderMode _mode;
+
+        public RequestSender(
+                Func<TEvent, TPayload> getPayload, 
+                MockExternalService<TPayload, int> mockService,
+                RequestSenderMode mode,
+                Action<Exception> onException
+            )
         {
             _mockService = mockService;
             _getPayload = getPayload;
-        }
-
-        public bool ShouldSpawnTaskFor(TEvent @event, long sequence, bool endOfBatch)
+            _onException = onException;
+            _mode = mode;
+        } 
+        
+        public void OnNext(TEvent @event, long sequence, bool endOfBatch, CancellationToken cancellationToken, Action<long> callback)
         {
-            return _getPayload(@event) != null;
+            var payload = _getPayload(@event);
+            if(payload != null)
+            {
+                if(_mode == RequestSenderMode.Task)
+                {
+                    AsyncExtensions.FireAndForget(async () => {
+                        await _mockService.Call(_getPayload(@event));
+                        callback(sequence);
+                    }, _onException);
+                }
+                else
+                {
+                    _mockService.CallWithCallback(_getPayload(@event), (unused) => callback(sequence));
+                }
+            }
+            else
+            {
+                callback(sequence);
+            }
         }
+    }
 
-        public async Task OnNext(TEvent @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
-        {
-            await _mockService.Call(_getPayload(@event));
-        }
+    public enum RequestSenderMode
+    {
+        Callback = 0,
+        Task = 1
     }
 }
