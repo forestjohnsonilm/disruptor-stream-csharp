@@ -227,14 +227,20 @@ namespace DisruptorTest
 
         private IEventProcessor[] GetRequestSenders (RingBuffer<EventType> ringBuffer, ISequenceBarrier sequenceBarrier)
         {
+            var mockExternalService = new MockExternalService<OutgoingRequest, int>();
+            AsyncExtensions.CreateNewLongRunningTask(
+                () =>  mockExternalService.Run(), 
+                (ex) => Assert.Fail(ex.StackTrace)
+            );
+
             var createOrUpdateRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
-                (@event) => @event.CreateOrUpdateTodoListRequest
+                (@event) => @event.CreateOrUpdateTodoListRequest, mockExternalService
             );
             var deleteRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
-                (@event) => @event.DeleteTodoListsRequest
+                (@event) => @event.DeleteTodoListsRequest, mockExternalService
             );
             var removeItemsRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
-                (@event) => @event.RemoveLineItemsRequest
+                (@event) => @event.RemoveLineItemsRequest, mockExternalService
             );
 
             return new IEventProcessor[] {

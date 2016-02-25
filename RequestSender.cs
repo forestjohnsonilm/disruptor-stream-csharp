@@ -12,11 +12,12 @@ namespace DisruptorTest
 {
     public class RequestSender<TEvent, TPayload> : AsyncEventProcessorImplementation<TEvent>
     {
-        private MockExternalService<TPayload> _mockService = new MockExternalService<TPayload>();
+        private MockExternalService<TPayload, int> _mockService;
 
         private readonly Func<TEvent, TPayload> _getPayload;
-        public RequestSender(Func<TEvent, TPayload> getPayload)
+        public RequestSender(Func<TEvent, TPayload> getPayload, MockExternalService<TPayload, int> mockService)
         {
+            _mockService = mockService;
             _getPayload = getPayload;
         }
 
