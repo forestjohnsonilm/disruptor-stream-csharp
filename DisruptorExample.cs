@@ -20,6 +20,12 @@ namespace DisruptorTest
         private List<Tuple<int, string>> _ratings = new List<Tuple<int, string>>();
 
 
+        [SetUp]
+        public void SetUp ()
+        {
+            _resultLog = new List<string>();
+        }
+
         [Test, Combinatorial]
         public async Task DemonstrateDisruptor(
                 [Values(1, 2)] int jsonParallelism,
@@ -92,7 +98,8 @@ namespace DisruptorTest
             //Console.WriteLine("===========================");
             //Console.WriteLine("");
 
-            await Task.Delay(new TimeSpan(0,0,0,0,500));
+            System.GC.Collect();
+            await Task.Delay(new TimeSpan(0,0,0,0,100));
 
             var timer = new Stopwatch();
             timer.Start();
