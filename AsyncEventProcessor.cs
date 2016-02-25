@@ -50,11 +50,14 @@ namespace DisruptorTest
                     OnCompleted(sequence);
                 }, _onException);
             }
+            else
+            {
+                OnCompleted(sequence);
+            }
         }
 
         public override void OnCompleted(long sequence)
         {
-            Console.WriteLine("OnCompleted", this, GetHashCode(), sequence);
             _lock.WithLock(() => {
                 completed.Add(sequence);
                 long newDownstreamBarrierSequence = ConsumeContiguousCompletedSequence();

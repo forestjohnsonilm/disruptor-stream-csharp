@@ -14,7 +14,6 @@ namespace DisruptorTest
     {
         public async Task Call(TPayload payload)
         {
-            Console.WriteLine(JsonConvert.SerializeObject(payload));
             await Task.Delay(new TimeSpan(0,0,0,0,200));
         }
     }

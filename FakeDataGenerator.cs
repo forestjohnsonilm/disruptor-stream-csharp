@@ -36,7 +36,8 @@ namespace DisruptorTest
                 }
                 else
                 {
-                    todoListVersion = ++todoListVersions[todoListId];
+                    todoListVersions[todoListId] = todoListVersions[todoListId] + 1;
+                    todoListVersion = todoListVersions[todoListId];
                 }
 
                 var itemCount = random.Next() % maxItemsPerList;

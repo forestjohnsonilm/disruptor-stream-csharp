@@ -38,12 +38,15 @@ namespace DisruptorTest
 
     public class TodoList : BaseTodoList
     {
+        public TodoList() { }
         public TodoList(Guid id)
         {
+            Id = id;
             LineItems = Enumerable.Empty<LineItem>();
         }
         public TodoList(Guid id, IEnumerable<LineItem> lineItems)
         {
+            Id = id;
             LineItems = lineItems;
         }
         public TodoList(Guid id, int version, string title, string description, IEnumerable<LineItem> lineItems)
@@ -83,6 +86,7 @@ namespace DisruptorTest
     {
         public SyncType SyncType;
 
+        public IncomingTodoList() { }
         public IncomingTodoList(Guid id, int version, string title, string description, SyncType syncType)
         {
             Id = id;

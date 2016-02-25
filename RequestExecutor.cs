@@ -27,17 +27,7 @@ namespace DisruptorTest
 
         public async Task OnNext(TEvent @event, long sequence, bool endOfBatch, CancellationToken cancellationToken)
         {
-            var payload = _getPayload(@event);
-
-            var content = (payload as OutgoingRequest).Content;
-            var ss = String.Join(",\n", content.Select(list => list.Id + "  " + list.Version + "   "));
-            Console.WriteLine("service call: " + ss);
-
-            await _mockService.Call(payload);
-
-            Console.WriteLine("DONE: " + ss);
+            await _mockService.Call(_getPayload(@event));
         }
-
-      
     }
 }

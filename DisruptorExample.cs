@@ -15,27 +15,54 @@ namespace DisruptorTest
     public class DisruptorExample
     {
 
-        [Test]
-        public async Task DemonstrateDisruptor()
+        private List<string> _resultLog = new List<string>();
+
+        private List<Tuple<int, string>> _ratings = new List<Tuple<int, string>>();
+
+
+        [Test, Combinatorial]
+        public async Task DemonstrateDisruptor(
+                [Values(1, 2, 4)] int jsonParallelism,
+                [Values(1024)] int ringSize,
+                [Values("sleep", "yield" )] string waitStrategyName,
+                [Values("multi-low-contention", "single")] string claimStrategyName
+            )
         {
-            var parallelism = 4;
             var listsPerRequest = 5;
-            var numberOfTodoLists = 10;
-            var numberOfUpdates = 10;
+            var numberOfTodoLists = 3000;
+            var numberOfUpdates = 3000;
             var maxNumberOfItemsPerList = 4;
 
-            var ringSize = (int)Math.Pow(2, 10);
+            if(waitStrategyName == "multi-low-contention" && jsonParallelism == 4)
+            {
+                // avoid this configuration, because its super slow. 
+                return;
+            }
+
+            var waitStrategies = new Dictionary<string, IWaitStrategy>()
+            {
+                { "busy", new BusySpinWaitStrategy() },
+                { "block", new BlockingWaitStrategy() },
+                { "yield", new YieldingWaitStrategy() },
+                { "sleep", new SleepingWaitStrategy() },
+            };
+            var claimStrategies = new Dictionary<string, IClaimStrategy>()
+            {
+                { "single", new SingleThreadedClaimStrategy(ringSize) },
+                { "multi", new MultiThreadedClaimStrategy(ringSize) },
+                { "multi-low-contention", new MultiThreadedLowContentionClaimStrategy(ringSize) },
+            };
+
             var disruptor = new Disruptor<EventType>(
                 () => new EventType(),
-                //ringSize,
-                new SingleThreadedClaimStrategy(ringSize),
-                new SleepingWaitStrategy(),
+                claimStrategies[claimStrategyName],
+                waitStrategies[waitStrategyName],
                 TaskScheduler.Default
             );
 
             var ringBuffer = disruptor.RingBuffer;
 
-            var deserialize = GetDeserializers(parallelism);
+            var deserialize = GetDeserializers(jsonParallelism);
             var groupIntoRequests = GetRequestBuilders(listsPerRequest);
 
             disruptor.HandleEventsWith(deserialize)
@@ -55,7 +82,8 @@ namespace DisruptorTest
             var configuredRingBuffer = disruptor.Start();
 
             // There is a bug in the Disruptor code that prevents custom EventProcessors from running automatically
-            // so we start them manually. If they were to be started twice, it would throw an exception. 
+            // so we start them manually. If they were already started, and we try to start them again,
+            // it would throw an exception here. 
             foreach(var requestExecutor in executeRequests)
             {
                 AsyncExtensions.CreateNewLongRunningTask(() => requestExecutor.Run(), (ex) => Assert.Fail(ex.StackTrace));
@@ -65,35 +93,66 @@ namespace DisruptorTest
 
             var messages = FakeDataGenerator.Generate(numberOfTodoLists, numberOfUpdates, maxNumberOfItemsPerList);
 
-            Console.WriteLine("");
-            Console.WriteLine("===========================");
-            Console.WriteLine("");
+            //Console.WriteLine("");
+            //Console.WriteLine("===========================");
+            //Console.WriteLine("");
+
+            await Task.Delay(new TimeSpan(0,0,0,0,500));
 
             var timer = new Stopwatch();
             timer.Start();
             for (var i = 0; i < messages.Length; i++)
             {
+                // PublishEvent will block if there is no space avaliable on the ring buffer.
                 eventPublisher.PublishEvent((@event, sequence) => {
                     @event.IncomingMessage = messages[i];
                     return @event;
                 });
             }
-            await Task.Delay(new TimeSpan(0,0,0,0,3000));
-            //disruptor.Shutdown();
+            // Shutdown will block until the ring buffer is empty.
+            disruptor.Shutdown();
             timer.Stop();
 
-            Console.WriteLine("");
-            Console.WriteLine("===========================");
-            Console.WriteLine("");
-            Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms");
+            // Uncomment this to show a concise version of the requests that would have been sent. 
+            //Console.WriteLine(string.Join("\n", _resultLog));
+
+            //Console.WriteLine("");
+            //Console.WriteLine("===========================");
+            //Console.WriteLine("");
+
+            var elapsedSeconds = (float)timer.ElapsedMilliseconds / 1000;
+            var ratePerSecond = (int)Math.Round((float)numberOfUpdates / elapsedSeconds);
+
+            var strategy =   $"{nameof(jsonParallelism)}: {jsonParallelism}, "
+                           + $"{nameof(ringSize)}: {ringSize}, "
+                           + $"{nameof(waitStrategyName)}: {waitStrategyName}, "
+                           + $"{nameof(claimStrategyName)}: {claimStrategyName}.";
+
+            Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms to process " + numberOfUpdates + " updates ");
+            Console.WriteLine("at a rate of " + ratePerSecond + " per second ");
+            Console.WriteLine("using strategy: " + strategy);
+
+            _ratings.Add(new Tuple<int, string>(ratePerSecond, strategy));
         }
         
+        [TearDown]
+        public void TearDown()
+        {
+            var topRated =
+                _ratings.OrderByDescending(x => x.Item1)
+                .Take(10)
+                .Select(x => "rate of " + x.Item1 + " with " + x.Item2);
+
+            Console.WriteLine(string.Join("\n", topRated));
+            
+        }
      
 
         private ParallelEventHandler<EventType>[] GetDeserializers(int parallelism)
         {
             Action<EventType, long, bool> deserializeAction = (@event, sequence, isEndOfBatch) =>
             {
+                //new OptimizedDeserializer().Deserialize(@event.IncomingMessage.ContentJson);
                 @event.IncomingMessage.Content = JsonConvert.DeserializeObject<IncomingMessageContent>(@event.IncomingMessage.ContentJson);
                 @event.IncomingMessage.ContentJson = null;
             };
@@ -167,10 +226,10 @@ namespace DisruptorTest
                 (@event) => @event.CreateOrUpdateTodoListRequest
             );
             var deleteRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
-                (@event) => @event.CreateOrUpdateTodoListRequest
+                (@event) => @event.DeleteTodoListsRequest
             );
             var removeItemsRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
-                (@event) => @event.CreateOrUpdateTodoListRequest
+                (@event) => @event.RemoveLineItemsRequest
             );
 
             return new IEventProcessor[] {
@@ -215,8 +274,9 @@ namespace DisruptorTest
         private void LogRequest(string prefix, OutgoingRequest request)
         {
             var idsAndVersions = String.Join(",\n", request.Content.Select(list => "    " + list.Id + "  Version: " + list.Version));
-            Console.WriteLine(prefix + ":\n" + idsAndVersions);
+            _resultLog.Add(prefix + ":\n" + idsAndVersions);
         }
+
 
         public class EventType
         {
