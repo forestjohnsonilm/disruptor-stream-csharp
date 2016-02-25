@@ -12,7 +12,7 @@ using System.Diagnostics;
 namespace DisruptorTest
 {
     [TestFixture]
-    public class DisruptorExample
+    public class DisruptorTest
     {
 
         private List<string> _resultLog = new List<string>();
@@ -118,7 +118,7 @@ namespace DisruptorTest
             //Console.WriteLine(string.Join("\n", _resultLog));
 
             var elapsedSeconds = (float)timer.ElapsedMilliseconds / 1000;
-            var ratePerSecond = (int)Math.Round((float)megabytesThroughput / elapsedSeconds);
+            var rateMegabytesPerSecond = (int)Math.Round((float)megabytesThroughput / elapsedSeconds);
 
             var strategy = $"{nameof(jsonParallelism)}: {jsonParallelism}, "
                            + $"{nameof(ringSize)}: {ringSize}, "
@@ -127,10 +127,10 @@ namespace DisruptorTest
 
             Console.WriteLine();
             Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms to process " + numberOfUpdates + " updates ");
-            Console.WriteLine("at a rate of " + ratePerSecond + " megabytes per second ");
+            Console.WriteLine("at a rate of " + rateMegabytesPerSecond + " megabytes per second ");
             Console.WriteLine();
 
-            _ratings.Add(new Tuple<int, string>(ratePerSecond, strategy));
+            _ratings.Add(new Tuple<int, string>(rateMegabytesPerSecond, strategy));
         }
         
         [TearDown]

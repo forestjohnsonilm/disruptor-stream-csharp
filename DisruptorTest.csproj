@@ -80,7 +80,7 @@
     <Compile Include="RequestBuilder.cs" />
     <Compile Include="Models.cs" />
     <Compile Include="AsyncEventProcessor.cs" />
-    <Compile Include="DisruptorExample.cs" />
+    <Compile Include="DisruptorTest.cs" />
     <Compile Include="ILock.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SpinLock.cs" />
