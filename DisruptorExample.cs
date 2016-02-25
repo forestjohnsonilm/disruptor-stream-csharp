@@ -28,16 +28,16 @@ namespace DisruptorTest
 
         [Test, Combinatorial]
         public async Task DemonstrateDisruptor(
-                [Values(1, 2)] int jsonParallelism,
-                [Values(1024)] int ringSize,
-                [Values("yield", "sleep" )] string waitStrategyName,
-                [Values("multi-low-contention", "single")] string claimStrategyName
+                [Values(1, 2, 4)] int jsonParallelism,
+                [Values(1024, 512)] int ringSize,
+                [Values(10, 80)] int maxNumberOfItemsPerList,
+                [Values("sleep" )] string waitStrategyName,
+                [Values("multi-low-contention")] string claimStrategyName
             )
         {
             var listsPerRequest = 5;
-            var numberOfTodoLists = 3000;
-            var numberOfUpdates = 3000;
-            var maxNumberOfItemsPerList = 4;
+            var numberOfTodoLists = 1500;
+            var numberOfUpdates = 1500;
 
             var waitStrategies = new Dictionary<string, IWaitStrategy>()
             {
@@ -94,6 +94,9 @@ namespace DisruptorTest
 
             var messages = FakeDataGenerator.Generate(numberOfTodoLists, numberOfUpdates, maxNumberOfItemsPerList);
 
+            var bytesThroughput = messages.Sum(x => (long)x.ContentJson.Length*2);
+            var megabytesThroughput = (double)bytesThroughput / 1000000;
+
             //Console.WriteLine("");
             //Console.WriteLine("===========================");
             //Console.WriteLine("");
@@ -123,15 +126,16 @@ namespace DisruptorTest
             //Console.WriteLine("");
 
             var elapsedSeconds = (float)timer.ElapsedMilliseconds / 1000;
-            var ratePerSecond = (int)Math.Round((float)numberOfUpdates / elapsedSeconds);
+            var ratePerSecond = (int)Math.Round((float)megabytesThroughput / elapsedSeconds);
 
-            var strategy =   $"{nameof(jsonParallelism)}: {jsonParallelism}, "
+            var strategy = $"{nameof(jsonParallelism)}: {jsonParallelism}, "
                            + $"{nameof(ringSize)}: {ringSize}, "
-                           + $"{nameof(waitStrategyName)}: {waitStrategyName}, "
-                           + $"{nameof(claimStrategyName)}: {claimStrategyName}.";
+                           + $"{nameof(maxNumberOfItemsPerList)}: {maxNumberOfItemsPerList}, ";
+                           //+ $"{nameof(waitStrategyName)}: {waitStrategyName}, "
+                           //+ $"{nameof(claimStrategyName)}: {claimStrategyName}.";
 
             Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms to process " + numberOfUpdates + " updates ");
-            Console.WriteLine("at a rate of " + ratePerSecond + " per second ");
+            Console.WriteLine("at a rate of " + ratePerSecond + " megabytes per second ");
             Console.WriteLine("using strategy: " + strategy);
 
             _ratings.Add(new Tuple<int, string>(ratePerSecond, strategy));
