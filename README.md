@@ -16,4 +16,4 @@ rate of 3003 with jsonParallelism: 2, ringSize: 1024, waitStrategy: yield, claim
 rate of 2994 with jsonParallelism: 1, ringSize: 1024, waitStrategy: yield, claimStrategy: multi-low-contention.
 rate of 2944 with jsonParallelism: 1, ringSize: 1024, waitStrategy: sleep, claimStrategy: single.
 rate of 2893 with jsonParallelism: 2, ringSize: 1024, waitStrategy: sleep, claimStrategy: single.
-``
+```
