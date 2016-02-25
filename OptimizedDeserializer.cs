@@ -67,8 +67,8 @@ namespace DisruptorTest
 
                 if (lastArrayProperty == LastArrayProp.TodoLists && reader.TokenType == JsonToken.Integer)
                 {
-                    if (currentProperty == "SyncType")
-                        currentTodoList.SyncType = (SyncType)Int32.Parse(reader.Value.ToString());
+                    if (currentProperty == "RequestType")
+                        currentTodoList.RequestType = (RequestType)Int32.Parse(reader.Value.ToString());
                     if (currentProperty == "Version")
                         currentTodoList.Version = Int32.Parse(reader.Value.ToString());
                 }
@@ -84,8 +84,8 @@ namespace DisruptorTest
 
                 if (lastArrayProperty == LastArrayProp.LineItems && reader.TokenType == JsonToken.Integer)
                 {
-                    if (currentProperty == "SyncType")
-                        currentLineItem.SyncType = (SyncType)Int32.Parse(reader.Value.ToString());
+                    if (currentProperty == "RequestType")
+                        currentLineItem.RequestType = (RequestType)Int32.Parse(reader.Value.ToString());
                     if (currentProperty == "Version")
                         currentLineItem.Version = Int32.Parse(reader.Value.ToString());
                     if (currentProperty == "Id")

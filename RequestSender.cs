@@ -10,12 +10,12 @@ using Newtonsoft.Json;
 
 namespace DisruptorTest
 {
-    public class RequestExecutor<TEvent, TPayload> : AsyncEventProcessorImplementation<TEvent>
+    public class RequestSender<TEvent, TPayload> : AsyncEventProcessorImplementation<TEvent>
     {
         private MockExternalService<TPayload> _mockService = new MockExternalService<TPayload>();
 
         private readonly Func<TEvent, TPayload> _getPayload;
-        public RequestExecutor(Func<TEvent, TPayload> getPayload)
+        public RequestSender(Func<TEvent, TPayload> getPayload)
         {
             _getPayload = getPayload;
         }

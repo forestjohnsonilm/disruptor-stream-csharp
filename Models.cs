@@ -84,16 +84,16 @@ namespace DisruptorTest
 
     public class IncomingTodoList : BaseTodoList
     {
-        public SyncType SyncType;
+        public RequestType RequestType;
 
         public IncomingTodoList() { }
-        public IncomingTodoList(Guid id, int version, string title, string description, SyncType syncType)
+        public IncomingTodoList(Guid id, int version, string title, string description, RequestType requestType)
         {
             Id = id;
             Version = version;
             Title = title;
             Description = description;
-            SyncType = syncType;
+            RequestType = requestType;
         }
     }
 
@@ -108,11 +108,11 @@ namespace DisruptorTest
 
     public class IncomingLineItem : LineItem
     {
-        public SyncType SyncType;
+        public RequestType RequestType;
         public Guid TodoListId;
     }
 
-    public enum SyncType
+    public enum RequestType
     {
         CreateOrUpdate = 0,
         Delete = 1

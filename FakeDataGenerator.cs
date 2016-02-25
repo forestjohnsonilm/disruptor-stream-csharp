@@ -52,7 +52,7 @@ namespace DisruptorTest
                         SortOrder = itemCount - j,
                         Done = random.NextDouble() > 0.5d,
                         TaskDescription = Guid.NewGuid().ToString(),
-                        SyncType = random.NextDouble() > 0.5d ? SyncType.CreateOrUpdate : SyncType.Delete
+                        RequestType = random.NextDouble() > 0.5d ? RequestType.CreateOrUpdate : RequestType.Delete
                     });
                 }
 
@@ -64,7 +64,7 @@ namespace DisruptorTest
                             todoListVersion,
                             Guid.NewGuid().ToString(),
                             Guid.NewGuid().ToString(),
-                            random.NextDouble() > 0.5d ? SyncType.CreateOrUpdate : SyncType.Delete
+                            random.NextDouble() > 0.5d ? RequestType.CreateOrUpdate : RequestType.Delete
                         )
                     },
                     LineItems = lineItems

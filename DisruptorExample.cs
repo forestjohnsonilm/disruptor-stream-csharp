@@ -68,15 +68,16 @@ namespace DisruptorTest
             disruptor.HandleEventsWith(deserialize)
                 .Then(groupIntoRequests);
 
+            // Since the Request Senders are EventProcessors(async) instead of EventHandlers(synchronous)
+            // We have to manually create a sequence barrier and pass it in instead of just calling .Then() again.
             var barrierUntilRequestsAreGrouped = disruptor.After(groupIntoRequests).AsSequenceBarrier();
+            var sendRequests = GetRequestSenders(ringBuffer, barrierUntilRequestsAreGrouped);
 
-            var executeRequests = GetRequestExecutors(ringBuffer, barrierUntilRequestsAreGrouped);
-
-            disruptor.HandleEventsWith(executeRequests);
+            disruptor.HandleEventsWith(sendRequests);
 
             var writeLog = GetFinalLoggingEventHandler();
 
-            disruptor.After(executeRequests)
+            disruptor.After(sendRequests)
                 .Then(writeLog);
 
             var configuredRingBuffer = disruptor.Start();
@@ -84,9 +85,9 @@ namespace DisruptorTest
             // There is a bug in the Disruptor code that prevents custom EventProcessors from running automatically
             // so we start them manually. If they were already started, and we try to start them again,
             // it would throw an exception here. 
-            foreach(var requestExecutor in executeRequests)
+            foreach(var requestSender in sendRequests)
             {
-                AsyncExtensions.CreateNewLongRunningTask(() => requestExecutor.Run(), (ex) => Assert.Fail(ex.StackTrace));
+                AsyncExtensions.CreateNewLongRunningTask(() => requestSender.Run(), (ex) => Assert.Fail(ex.StackTrace));
             }
 
             var eventPublisher = new EventPublisher<EventType>(configuredRingBuffer);
@@ -169,7 +170,7 @@ namespace DisruptorTest
                 (@event) => new OutgoingRequest()
                 {
                     Content = @event.IncomingMessage.Content.TodoLists
-                        .Where(x => x.SyncType == SyncType.Delete)
+                        .Where(x => x.RequestType == RequestType.Delete)
                         .Select(x => new TodoList(x.Id))
                 };
 
@@ -184,8 +185,8 @@ namespace DisruptorTest
                     var content = @event.IncomingMessage.Content;
                     return new OutgoingRequest()
                     {
-                        Content = from todoList in content.TodoLists.Where(x => x.SyncType == SyncType.CreateOrUpdate)
-                                  join lineItem in content.LineItems.Where(x => x.SyncType == SyncType.CreateOrUpdate)
+                        Content = from todoList in content.TodoLists.Where(x => x.RequestType == RequestType.CreateOrUpdate)
+                                  join lineItem in content.LineItems.Where(x => x.RequestType == RequestType.CreateOrUpdate)
                                       on todoList.Id equals lineItem.TodoListId into lineItems
                                   select new TodoList(todoList.Id, todoList.Version, todoList.Title, todoList.Description, lineItems)
                     };
@@ -202,8 +203,8 @@ namespace DisruptorTest
                     var content = @event.IncomingMessage.Content;
                     return new OutgoingRequest()
                     {
-                        Content = from todoList in content.TodoLists.Where(x => x.SyncType == SyncType.CreateOrUpdate)
-                                  join lineItem in content.LineItems.Where(x => x.SyncType == SyncType.Delete)
+                        Content = from todoList in content.TodoLists.Where(x => x.RequestType == RequestType.CreateOrUpdate)
+                                  join lineItem in content.LineItems.Where(x => x.RequestType == RequestType.Delete)
                                       on todoList.Id equals lineItem.TodoListId into lineItems
                                   select new TodoList(todoList.Id, lineItems)
                     };
@@ -223,15 +224,15 @@ namespace DisruptorTest
         }
 
 
-        private IEventProcessor[] GetRequestExecutors (RingBuffer<EventType> ringBuffer, ISequenceBarrier sequenceBarrier)
+        private IEventProcessor[] GetRequestSenders (RingBuffer<EventType> ringBuffer, ISequenceBarrier sequenceBarrier)
         {
-            var createOrUpdateRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
+            var createOrUpdateRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
                 (@event) => @event.CreateOrUpdateTodoListRequest
             );
-            var deleteRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
+            var deleteRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
                 (@event) => @event.DeleteTodoListsRequest
             );
-            var removeItemsRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
+            var removeItemsRequestExecutor = new RequestSender<EventType, OutgoingRequest>(
                 (@event) => @event.RemoveLineItemsRequest
             );
 
