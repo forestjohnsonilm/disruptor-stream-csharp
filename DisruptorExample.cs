@@ -14,6 +14,7 @@ namespace DisruptorTest
     [TestFixture]
     public class DisruptorExample
     {
+
         [Test]
         public async Task DemonstrateDisruptor()
         {
@@ -46,6 +47,11 @@ namespace DisruptorTest
 
             disruptor.HandleEventsWith(executeRequests);
 
+            var writeLog = GetFinalLoggingEventHandler();
+
+            disruptor.After(executeRequests)
+                .Then(writeLog);
+
             var configuredRingBuffer = disruptor.Start();
 
             // There is a bug in the Disruptor code that prevents custom EventProcessors from running automatically
@@ -72,7 +78,7 @@ namespace DisruptorTest
                     return @event;
                 });
             }
-            await Task.Delay(new TimeSpan(0,0,0,0,3000));
+            await Task.Delay(new TimeSpan(0,0,0,0,1000));
             //disruptor.Shutdown();
             timer.Stop();
 
@@ -158,22 +164,13 @@ namespace DisruptorTest
         private IEventProcessor[] GetRequestExecutors (RingBuffer<EventType> ringBuffer, ISequenceBarrier sequenceBarrier)
         {
             var createOrUpdateRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
-                (@event) => {
-                    LogRequest("cr", @event.CreateOrUpdateTodoListRequest);
-                    return @event.CreateOrUpdateTodoListRequest;
-                }
+                (@event) => @event.CreateOrUpdateTodoListRequest
             );
             var deleteRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
-                (@event) => {
-                    LogRequest("del", @event.CreateOrUpdateTodoListRequest);
-                    return @event.CreateOrUpdateTodoListRequest;
-                }
+                (@event) => @event.CreateOrUpdateTodoListRequest
             );
             var removeItemsRequestExecutor = new RequestExecutor<EventType, OutgoingRequest>(
-                (@event) => {
-                    LogRequest("rm", @event.CreateOrUpdateTodoListRequest);
-                    return @event.CreateOrUpdateTodoListRequest;
-                }
+                (@event) => @event.CreateOrUpdateTodoListRequest
             );
 
             return new IEventProcessor[] {
@@ -192,13 +189,33 @@ namespace DisruptorTest
             };
         }
 
+        private IEventHandler<EventType> GetFinalLoggingEventHandler()
+        {
+            return new SimpleEventHandler<EventType>((@event, sequence, isEndOfBatch) =>
+            {
+                @event.IncomingMessage = null;
+                if(@event.RemoveLineItemsRequest != null)
+                {
+                    LogRequest("RemoveLineItemsRequest", @event.RemoveLineItemsRequest);
+                    @event.RemoveLineItemsRequest = null;
+                }
+                if (@event.CreateOrUpdateTodoListRequest != null)
+                {
+                    LogRequest("CreateOrUpdateTodoListRequest", @event.CreateOrUpdateTodoListRequest);
+                    @event.CreateOrUpdateTodoListRequest = null;
+                }
+                if (@event.DeleteTodoListsRequest != null)
+                {
+                    LogRequest("DeleteTodoListsRequest", @event.DeleteTodoListsRequest);
+                    @event.DeleteTodoListsRequest = null;
+                }
+            });
+        }
+
         private void LogRequest(string prefix, OutgoingRequest request)
         {
-            if (request == null)
-                return;
-            var content = request.Content;
-            var ss = String.Join(",\n", content.Select(list => list.Id + "  " + list.Version + "   "));
-            Console.WriteLine(prefix + ": " + ss);
+            var idsAndVersions = String.Join(",\n", request.Content.Select(list => "    " + list.Id + "  Version: " + list.Version));
+            Console.WriteLine(prefix + ":\n" + idsAndVersions);
         }
 
         public class EventType
