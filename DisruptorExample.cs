@@ -33,12 +33,6 @@ namespace DisruptorTest
             var numberOfUpdates = 3000;
             var maxNumberOfItemsPerList = 4;
 
-            if(waitStrategyName == "multi-low-contention" && jsonParallelism == 4)
-            {
-                // avoid this configuration, because its super slow. 
-                return;
-            }
-
             var waitStrategies = new Dictionary<string, IWaitStrategy>()
             {
                 { "busy", new BusySpinWaitStrategy() },

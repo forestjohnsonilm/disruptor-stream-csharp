@@ -77,7 +77,7 @@
     <Compile Include="ParallelEventHandler.cs" />
     <Compile Include="MockExternalService.cs" />
     <Compile Include="SimpleEventHandler.cs" />
-    <Compile Include="RequestExecutor.cs" />
+    <Compile Include="RequestSender.cs" />
     <Compile Include="RequestBuilder.cs" />
     <Compile Include="Models.cs" />
     <Compile Include="AsyncEventProcessor.cs" />
