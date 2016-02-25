@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace DisruptorTest
 {
-    public static class TaskExtensions 
+    public static class AsyncExtensions 
     {
         public static void CreateNewLongRunningTask(Action action, Action<Exception> onException)
         {

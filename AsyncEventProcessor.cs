@@ -45,7 +45,7 @@ namespace DisruptorTest
         {
             if(_implementation.ShouldSpawnTaskFor(@event, sequence, lastInBatch))
             {
-                TaskExtensions.FireAndForget(async () => {
+                AsyncExtensions.FireAndForget(async () => {
                     await _implementation.OnNext(@event, sequence, lastInBatch, _cancellationTokenSource.Token);
                     OnCompleted(sequence);
                 }, _onException);

@@ -52,7 +52,7 @@ namespace DisruptorTest
             // so we start them manually. If they were to be started twice, it would throw an exception. 
             foreach(var requestExecutor in executeRequests)
             {
-                TaskExtensions.CreateNewLongRunningTask(() => requestExecutor.Run(), (ex) => Assert.Fail(ex.StackTrace));
+                AsyncExtensions.CreateNewLongRunningTask(() => requestExecutor.Run(), (ex) => Assert.Fail(ex.StackTrace));
             }
 
             var eventPublisher = new EventPublisher<EventType>(configuredRingBuffer);
