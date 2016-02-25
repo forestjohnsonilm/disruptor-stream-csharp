@@ -136,7 +136,9 @@ namespace DisruptorTest
 
             Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms to process " + numberOfUpdates + " updates ");
             Console.WriteLine("at a rate of " + ratePerSecond + " megabytes per second ");
-            Console.WriteLine("using strategy: " + strategy);
+
+            Console.WriteLine();
+            Console.WriteLine();
 
             _ratings.Add(new Tuple<int, string>(ratePerSecond, strategy));
         }
@@ -147,7 +149,7 @@ namespace DisruptorTest
             var topRated =
                 _ratings.OrderByDescending(x => x.Item1)
                 .Take(10)
-                .Select(x => "rate of " + x.Item1 + " with " + x.Item2);
+                .Select(x => "rate of " + x.Item1 + " MB/s with " + x.Item2);
 
             Console.WriteLine(string.Join("\n", topRated));
             
