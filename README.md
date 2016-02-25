@@ -1,5 +1,5 @@
 ## disruptor-stream-csharp
-An example of the Disruptor C# implementation which processes a stream of updates to Todo Lists.
+An example of the Disruptor C# implementation which processes a stream of updates to Todo Lists and sends them to an imaginary database.
 
 To test the project on your machine, run the NUnit tests. The tests will try all different configuration combinations and report a ranked list to the test-ouput.
 
