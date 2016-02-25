@@ -12,6 +12,8 @@ namespace DisruptorTest
 {
     public class RequestExecutor<TEvent, TPayload> : AsyncEventProcessorImplementation<TEvent>
     {
+        private MockExternalService<TPayload> _mockService = new MockExternalService<TPayload>();
+
         private readonly Func<TEvent, TPayload> _getPayload;
         public RequestExecutor(Func<TEvent, TPayload> getPayload)
         {
@@ -31,7 +33,9 @@ namespace DisruptorTest
             var ss = String.Join(",\n", content.Select(list => list.Id + "  " + list.Version + "   "));
             Console.WriteLine("service call: " + ss);
 
-            await MockExternalService<TPayload>.Call(payload);
+            await _mockService.Call(payload);
+
+            Console.WriteLine("DONE: " + ss);
         }
 
       

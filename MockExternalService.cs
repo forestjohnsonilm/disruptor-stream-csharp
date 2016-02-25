@@ -12,7 +12,7 @@ namespace DisruptorTest
 {
     public class MockExternalService<TPayload>
     {
-        public static async Task Call(TPayload payload)
+        public async Task Call(TPayload payload)
         {
             Console.WriteLine(JsonConvert.SerializeObject(payload));
             await Task.Delay(new TimeSpan(0,0,0,0,200));
