@@ -71,6 +71,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="AbstractEventProcessor.cs" />
+    <Compile Include="FakeDataGenerator.cs" />
     <Compile Include="ParallelEventHandler.cs" />
     <Compile Include="MockExternalService.cs" />
     <Compile Include="RequestBuilder.cs" />

@@ -7,20 +7,30 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using System.Diagnostics;
 
 namespace DisruptorTest
 {
     [TestFixture]
     public class DisruptorExample
     {
-
         [Test]
         public void DemonstrateDisruptor()
         {
             var parallelism = 4;
             var listsPerRequest = 10;
+            var numberOfTodoLists = 10;
+            var numberOfUpdates = 10;
+            var maxNumberOfItemsPerList = 4;
 
-            var disruptor = new Disruptor<EventType>(() => new EventType(), (int)Math.Pow(2, 10), TaskScheduler.Default);
+            var ringSize = (int)Math.Pow(2, 10);
+            var disruptor = new Disruptor<EventType>(
+                () => new EventType(),
+                //ringSize,
+                new SingleThreadedClaimStrategy(ringSize),
+                new SleepingWaitStrategy(),
+                TaskScheduler.Default
+            );
 
             var ringBuffer = disruptor.RingBuffer;
 
@@ -36,8 +46,48 @@ namespace DisruptorTest
 
             disruptor.HandleEventsWith(executeRequests);
 
+            var configuredRingBuffer = disruptor.Start();
+
+            // There is a bug in the Disruptor code that prevents custom EventProcessors from running automatically
+            // so we start them manually. If they were to be started twice, it would throw an exception. 
+            foreach(var requestExecutor in executeRequests)
+            {
+                Task.Factory.StartNew(
+                    requestExecutor.Run,
+                    CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default
+                );
+            }
+
+            var eventPublisher = new EventPublisher<EventType>(configuredRingBuffer);
+
+            var fakeData = FakeDataGenerator.Generate(numberOfTodoLists, numberOfUpdates, maxNumberOfItemsPerList);
+
+            LoadTest(eventPublisher, () => disruptor.Shutdown(), fakeData);
         }
 
+        private void LoadTest(EventPublisher<EventType> eventPublisher, Action shutdown, IncomingMessage[] messages)
+        {
+            Console.WriteLine("");
+            Console.WriteLine("===========================");
+            Console.WriteLine("");
+
+            var timer = new Stopwatch();
+            timer.Start();
+            for (var i = 0; i < messages.Length; i++)
+            {
+                eventPublisher.PublishEvent((@event, sequence) => {
+                    @event.IncomingMessage = messages[i];
+                    return @event;
+                });
+            }
+            shutdown();
+            timer.Stop();
+
+            Console.WriteLine("");
+            Console.WriteLine("===========================");
+            Console.WriteLine("");
+            Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms");
+        }
 
         private ParallelEventHandler<EventType>[] GetDeserializers(int parallelism)
         {
