@@ -83,7 +83,6 @@
     <Compile Include="DisruptorExample.cs" />
     <Compile Include="ILock.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Extensions.cs" />
     <Compile Include="SpinLock.cs" />
   </ItemGroup>
   <ItemGroup>

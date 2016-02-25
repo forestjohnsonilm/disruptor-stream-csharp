@@ -78,7 +78,7 @@ namespace DisruptorTest
                     return @event;
                 });
             }
-            await Task.Delay(new TimeSpan(0,0,0,0,1000));
+            await Task.Delay(new TimeSpan(0,0,0,0,3000));
             //disruptor.Shutdown();
             timer.Stop();
 
