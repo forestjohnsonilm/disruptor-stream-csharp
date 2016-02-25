@@ -97,10 +97,6 @@ namespace DisruptorTest
             var bytesThroughput = messages.Sum(x => (long)x.ContentJson.Length*2);
             var megabytesThroughput = (double)bytesThroughput / 1000000;
 
-            //Console.WriteLine("");
-            //Console.WriteLine("===========================");
-            //Console.WriteLine("");
-
             System.GC.Collect();
             await Task.Delay(new TimeSpan(0,0,0,0,100));
 
@@ -121,23 +117,17 @@ namespace DisruptorTest
             // Uncomment this to show a concise version of the requests that would have been sent. 
             //Console.WriteLine(string.Join("\n", _resultLog));
 
-            //Console.WriteLine("");
-            //Console.WriteLine("===========================");
-            //Console.WriteLine("");
-
             var elapsedSeconds = (float)timer.ElapsedMilliseconds / 1000;
             var ratePerSecond = (int)Math.Round((float)megabytesThroughput / elapsedSeconds);
 
             var strategy = $"{nameof(jsonParallelism)}: {jsonParallelism}, "
                            + $"{nameof(ringSize)}: {ringSize}, "
                            + $"{nameof(maxNumberOfItemsPerList)}: {maxNumberOfItemsPerList}, ";
-                           //+ $"{nameof(waitStrategyName)}: {waitStrategyName}, "
-                           //+ $"{nameof(claimStrategyName)}: {claimStrategyName}.";
 
-            Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms to process " + numberOfUpdates + " updates ");
-            Console.WriteLine("at a rate of " + ratePerSecond + " megabytes per second ");
 
             Console.WriteLine();
+            Console.WriteLine("Took: " + timer.ElapsedMilliseconds + " ms to process " + numberOfUpdates + " updates ");
+            Console.WriteLine("at a rate of " + ratePerSecond + " megabytes per second ");
             Console.WriteLine();
 
             _ratings.Add(new Tuple<int, string>(ratePerSecond, strategy));
