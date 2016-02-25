@@ -22,9 +22,9 @@ namespace DisruptorTest
 
         [Test, Combinatorial]
         public async Task DemonstrateDisruptor(
-                [Values(1, 2, 4)] int jsonParallelism,
+                [Values(1, 2)] int jsonParallelism,
                 [Values(1024)] int ringSize,
-                [Values("sleep", "yield" )] string waitStrategyName,
+                [Values("yield", "sleep" )] string waitStrategyName,
                 [Values("multi-low-contention", "single")] string claimStrategyName
             )
         {
@@ -152,8 +152,11 @@ namespace DisruptorTest
         {
             Action<EventType, long, bool> deserializeAction = (@event, sequence, isEndOfBatch) =>
             {
-                //new OptimizedDeserializer().Deserialize(@event.IncomingMessage.ContentJson);
-                @event.IncomingMessage.Content = JsonConvert.DeserializeObject<IncomingMessageContent>(@event.IncomingMessage.ContentJson);
+                // I wrote an optimized deserializer to test the performance difference, to see if JsonConvert is slow.
+                // It is actually a tiny bit faster, but not really worth the effort in the end.
+                //@event.IncomingMessage.Content = JsonConvert.DeserializeObject<IncomingMessageContent>(@event.IncomingMessage.ContentJson);
+
+                @event.IncomingMessage.Content = new OptimizedDeserializer().Deserialize(@event.IncomingMessage.ContentJson);
                 @event.IncomingMessage.ContentJson = null;
             };
 
