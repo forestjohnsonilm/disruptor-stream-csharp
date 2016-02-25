@@ -73,7 +73,6 @@
     <Compile Include="AbstractEventProcessor.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="FakeDataGenerator.cs" />
-    <Compile Include="OptimizedDeserializer.cs" />
     <Compile Include="InterleavedParallelEventHandler.cs" />
     <Compile Include="MockExternalService.cs" />
     <Compile Include="SimpleEventHandler.cs" />

@@ -160,11 +160,7 @@ namespace DisruptorTest
         {
             Action<EventType, long, bool> deserializeAction = (@event, sequence, isEndOfBatch) =>
             {
-                // I wrote an optimized deserializer to test the performance difference, to see if JsonConvert is slow.
-                // It is actually a tiny bit faster, but not really worth the effort in the end.
-                //@event.IncomingMessage.Content = JsonConvert.DeserializeObject<IncomingMessageContent>(@event.IncomingMessage.ContentJson);
-
-                @event.IncomingMessage.Content = new OptimizedDeserializer().Deserialize(@event.IncomingMessage.ContentJson);
+                @event.IncomingMessage.Content = JsonConvert.DeserializeObject<IncomingMessageContent>(@event.IncomingMessage.ContentJson);
                 @event.IncomingMessage.ContentJson = null;
             };
 

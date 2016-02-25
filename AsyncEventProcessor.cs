@@ -20,7 +20,7 @@ namespace DisruptorTest
     {
         private readonly AsyncEventProcessorImplementation<T> _implementation;
         private readonly ILock _lock;
-        private readonly CancellationTokenSource _cancellationTokenSource;
+        private CancellationTokenSource _cancellationTokenSource;
         private SortedSet<long> completed = new SortedSet<long>();
         private long currentDownstreamBarrierSequence = -1L;
 
