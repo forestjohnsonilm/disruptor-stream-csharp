@@ -1,7 +1,9 @@
 ## disruptor-stream-csharp
+
 An example of the Disruptor C# implementation which processes a stream of updates to Todo Lists and sends them to an imaginary external service.
 
-To test the project on your machine, run the NUnit tests. The tests will try all different configuration combinations and report a ranked list to the test-ouput.
+### Dependency on NUnit 3 test adapter
+To test the project on your machine, install the NUnit 3 test adapter via Tools -> Extensions and Updates in Visual Studio. Then run the tests. It will try all different configuration combinations and report a ranked list to the test-ouput.
 
 ![nunit screenshot](Screenshot.png)
 
