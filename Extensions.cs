@@ -13,7 +13,7 @@ namespace DisruptorTest
 {
     public static class AsyncExtensions 
     {
-        public static void CreateNewLongRunningTask(Action action, Action<Exception> onException)
+        public static void FireAndForgetLongRunning(Action action, Action<Exception> onException)
         {
             Task.Factory.StartNew(
                 () => {

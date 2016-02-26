@@ -28,7 +28,7 @@ namespace DisruptorTest
 
         [Test, Combinatorial]
         public async Task DemonstrateDisruptor(
-                [Values(1, 2, 4)] int jsonParallelism,
+                [Values(1, 2, 4)] int numberOfDeserializers,
                 [Values(1024, 512)] int ringSize,
                 [Values(10, 80)] int maxNumberOfItemsPerList,
                 [Values("sleep" )] string waitStrategyName,
@@ -62,13 +62,13 @@ namespace DisruptorTest
 
             var ringBuffer = disruptor.RingBuffer;
 
-            var deserialize = GetDeserializers(jsonParallelism);
+            var deserialize = GetDeserializers(numberOfDeserializers);
             var groupIntoRequests = GetRequestBuilders(listsPerRequest);
 
             disruptor.HandleEventsWith(deserialize)
                 .Then(groupIntoRequests);
 
-            // Since the Request Senders are EventProcessors(async) instead of EventHandlers(synchronous)
+            // Since the Request Senders are AsyncEventProcessors instead of EventHandlers(synchronous)
             // We have to manually create a sequence barrier and pass it in instead of just calling .Then() again.
             var barrierUntilRequestsAreGrouped = disruptor.After(groupIntoRequests).AsSequenceBarrier();
             var sendRequests = GetRequestSenders(ringBuffer, barrierUntilRequestsAreGrouped, RequestSenderMode.Callback);
@@ -87,7 +87,7 @@ namespace DisruptorTest
             // it would throw an exception here. 
             foreach(var requestSender in sendRequests)
             {
-                AsyncExtensions.CreateNewLongRunningTask(() => requestSender.Run(), (ex) => Assert.Fail(ex.StackTrace));
+                AsyncExtensions.FireAndForgetLongRunning(() => requestSender.Run(), (ex) => Assert.Fail(ex.StackTrace));
             }
 
             var eventPublisher = new EventPublisher<EventType>(configuredRingBuffer);
@@ -120,7 +120,7 @@ namespace DisruptorTest
             var elapsedSeconds = (float)timer.ElapsedMilliseconds / 1000;
             var rateMegabytesPerSecond = (int)Math.Round((float)megabytesThroughput / elapsedSeconds);
 
-            var strategy = $"{nameof(jsonParallelism)}: {jsonParallelism}, "
+            var strategy = $"{nameof(numberOfDeserializers)}: {numberOfDeserializers}, "
                            + $"{nameof(ringSize)}: {ringSize}, "
                            + $"{nameof(maxNumberOfItemsPerList)}: {maxNumberOfItemsPerList}, ";
 
@@ -223,7 +223,7 @@ namespace DisruptorTest
             RequestSenderMode mode)
         {
             var mockExternalService = new MockExternalService<OutgoingRequest, int>();
-            AsyncExtensions.CreateNewLongRunningTask(
+            AsyncExtensions.FireAndForgetLongRunning(
                 () =>  mockExternalService.Run(), 
                 (ex) => Assert.Fail(ex.StackTrace)
             );
