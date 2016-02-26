@@ -3,7 +3,7 @@ An example of the Disruptor C# implementation which processes a stream of update
 
 To test the project on your machine, run the NUnit tests. The tests will try all different configuration combinations and report a ranked list to the test-ouput.
 
-![nunit screenshot](https://github.com/forestjohnsonilm/disruptor-stream-csharp/blob/master/Screenshot.png?raw=true)
+![nunit screenshot](Screenshot.png)
 
 On my laptop, the highest throughput was with large objects, a ring with 512 elements, 4 JSON threads, using the sleeping wait strategy and the low-contention multi-threaded claim strategy. It processed 89 Megabytes per second. 
 
